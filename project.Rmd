@@ -49,3 +49,111 @@ joined <- draftdata519 %>%
 ```
 
 
+```{r reorder}
+# reorder the columns so they are easier to read
+draftdata519 <- draftdata519 %>%
+  select(c(name_first_last, name_last_first, primary_position, bats, throws, birth_date, 
+           weight, height_feet, height_inches, team_full, team_abbrev, league_full, school,
+           avg, hr, rbi, so, sb, w, l, era, sv,
+           year, overall, round, round_sort, round_desc, pick,
+           everything())) %>% 
+  print(max = 200)
+```
+
+```{r}
+# count up how many players are in each type of draft
+# it looks like description and draft_type are the same thing
+count(draftdata519, description)
+count(draftdata519, draft_type)
+
+# see how many drafted players reach the majors
+count(draftdata519, mlb_g)
+```
+
+### Visualizations
+
+```{r}
+# create a new data set of players drafted between 2000-2010 for some exploratory data analysis
+draftdata00to10 <- draftdata %>%
+  filter(draft_type == "JR") %>%
+  filter(year >= 2000 & year <= 2010) %>%
+  mutate(hs = grepl("\\bHS\\b", school))
+
+# Proportion that reach MLB by round number, drafted in 2005+
+draftdata519 %>%
+  filter(round_sort <= 30 & draft_type == "JR") %>%
+  ggplot(aes(x = round_sort, fill = mlb_g)) +
+  geom_bar(position = "fill")
+
+# Proportion that reach MLB by round number, drafted between 2000-2010
+draftdata00to10 %>%
+  filter(round_sort <= 30) %>%
+  ggplot(aes(x = round_sort, fill = mlb_g)) +
+  geom_bar(position = "fill")
+
+```
+
+```{r}
+# Proportion drafted out of HS by round number
+draftdata00to10 %>%
+  filter(round_sort <= 30) %>%
+  ggplot(aes(x = round_sort, fill = hs)) +
+  geom_bar(position = "fill")
+
+# Proportion that reach MLB by round and HS
+draftdata00to10 %>%
+  filter(round_sort <= 50) %>%
+  group_by(round_sort, hs) %>%
+  summarize(mlb_freq = sum(ifelse(mlb_g == "Y", 1, 0)) / n()) %>%
+  ggplot(aes(x = round_sort, y = mlb_freq, color = hs)) +
+  geom_smooth(se = FALSE) +
+  geom_point()
+
+# Proportion that reach MLB by round and HS (facet wrap)
+draftdata00to10 %>%
+  filter(round_sort <= 30) %>%
+  ggplot(aes(x = round_sort, fill = mlb_g)) +
+  geom_bar(position = "fill") +
+  facet_wrap(. ~ hs)
+```
+
+```{r}
+# see how many players are drafted at each position
+count(draftdata00to10, primary_position) %>% arrange(desc(n))
+
+# make a vector of positions that occur more than 50 times
+keep_positions <- count(draftdata00to10, primary_position) %>%
+  filter(n > 50) %>% 
+  .$primary_position
+
+# remove positions that occur less than 50 times
+draftdata00to10 <- draftdata00to10 %>%
+  filter(primary_position %in% keep_positions)
+```
+
+```{r}
+# Proportion that reach MLB by position
+draftdata00to10 %>%
+  filter(round_sort <= 20) %>%
+  ggplot(aes(x = primary_position, fill = mlb_g)) +
+  geom_bar(position = "fill")
+
+# Proportion that reach MLB by batting hand
+draftdata00to10 %>%
+  filter(round_sort <= 20) %>%
+  # remove pitchers from the data
+  filter(!str_ends(primary_position, "P")) %>%
+  filter(bats != "") %>%
+  ggplot(aes(x = bats, fill = mlb_g)) +
+  geom_bar(position = "fill")
+
+count(draftdata00to10, bats) %>% arrange(desc(n))
+
+count(draftdata00to10, school) %>% arrange(desc(n))
+
+draftdata00to10 %>%
+  filter(round_sort <= 2) %>%
+  count(., school) %>%
+  arrange(desc(n))
+```
+
