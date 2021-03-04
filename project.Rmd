@@ -1,0 +1,51 @@
+---
+title: "Survival Analysis Project"
+author: "Erin Franke"
+date: "2/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning=FALSE}
+library(Lahman)
+library(XML)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(car)
+library(data.table)
+library(stringr)
+library(alluvial)
+library (glmnet)
+library(readr)
+library(lubridate)
+library(readxl)
+```
+
+```{r}
+#Read in the draft data and debut data set
+draftdata <- read.csv("draft_1965_2019-2.csv") 
+debuts <- read_xlsx("2005-2019 Debuts.xlsx")
+```
+
+```{r}
+#change the draftdata birth_date column to be a date and filter for draft years during and after 2005
+draftdata$birth_date <- as.Date(draftdata$birth_date)
+draftdata519 <- draftdata %>%
+  filter(year >= 2005 ) %>%
+  # define a logical variable "hs" which is TRUE if the player was drafted out of high school
+  # this is done by searching for "HS" in school using a regular expression
+  mutate(hs = grepl("\\bHS\\b", school))
+
+draftdata519 %>%
+  select(school, hs) %>% 
+  head(10)
+
+joined <- draftdata519 %>%
+  left_join(debuts, by = c("name_first_last" = "Name", "birth_date" = "Birthdate"))
+```
+
+
