@@ -166,5 +166,25 @@ draftdata05to10 %>%
 draftdata05to10 = draftdata05to10 %>% filter(!is.na(Debut))
 ```
 
+Examine the distribution of debut times and pick a reasonable cutoff point.
+```{r}
+min(draftdata05to10$timetodebut, na.rm = TRUE)
+max(draftdata05to10$timetodebut, na.rm = TRUE)
+mean(draftdata05to10$timetodebut, na.rm = TRUE)
+median(draftdata05to10$timetodebut, na.rm = TRUE)
+
+# 95% quantile of debuts times is 8.12 years
+quantile(draftdata05to10$timetodebut, 0.95) / 365
 
 
+# timetodebut for hs and college draft picks
+draftdata05to10 %>%
+  ggplot(aes(x = timetodebut / 365, group = hs, fill = hs)) +
+  geom_density(alpha = .5)
+
+draftdata05to10 %>%
+  ggplot(aes(x = timetodebut / 365)) +
+  geom_histogram(aes(x = timetodebut / 365), binwidth = 0.5) +
+  geom_density()
+
+```
