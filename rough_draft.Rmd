@@ -66,22 +66,16 @@ joined$`Last Game` <- as.Date(joined$`Last Game`)
 
 In order to have a proper analysis, we must also remove player duplicates. These players were drafted multiple times - we will take their latest draft year. 
 ```{r}
-joined = joined %>% mutate(newid1 = paste(name_first_last,birth_date) , newid2=paste(name_first_last,birth_date,year))
-LatestDraftYear = joined %>% group_by(newid1) %>% summarize(maxyear = max(year)) %>% mutate( newid2=paste(newid1,maxyear) )
-newdata = left_join(LatestDraftYear,joined)
+newdata <- joined %>% 
+  group_by(name_first_last, birth_date) %>%
+  filter(year == max(year))
 ```
 
 Recode the mlb_g and milb_g variable to make Y as 1 and N as 0. 
 ```{r}
 #record mlb_g and milb_g
-newdata$mlb_g <- newdata$mlb_g %>%
-  str_replace_all("Y", "1") %>%
-  str_replace_all("N", "0") %>%
-  as.integer(newdata$mlb_g)
-newdata$milb_g <- newdata$milb_g %>%
-  str_replace_all("Y", "1") %>%
-  str_replace_all("N", "0") %>%
-  as.integer(newdata$milb_g)
+newdata$mlb_g <- as.integer(newdata$mlb_g == "Y")
+newdata$milb_g <- as.integer(newdata$milb_g == "Y")
 ```
 
 In order to allow for right censoring later on, replace all that have not made their debut in the mlb with a debut data of Sep 30, 2019. Create a variable called timetodraft that the represents the length of time between debut and draft date in days.  
