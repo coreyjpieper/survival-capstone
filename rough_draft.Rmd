@@ -9,7 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Load in libraries for data analysis
+## Load libraries and data
+
 ```{r warning=FALSE}
 library(Lahman)
 library(XML)
@@ -39,20 +40,26 @@ draftdata <- read_csv("draft_1965_2019-2.csv")
 debuts <- read_xlsx("2005-2019 Debuts.xlsx")
 ```
 
+## Data cleaning
+
 Filter and clean the draft data, then join it with the debut data, keeping all players that were drafted between 2005 and 2019 but did not debut. Reorder the columns in the joined data set to make them easier to read and make appropriate columns be dates. 
 ```{r}
 #change the draftdata birth_date column to be a date format and filter for draft years during and after 2005. Additionally, define a logical variable "hs" that is TRUE if the player was drafted out of high school. This is done by searching for "HS" in school using a regular expression. 
 draftdata$birth_date <- as.Date(draftdata$birth_date)
 draftdata519 <- draftdata %>%
   filter(year >= 2005 ) %>%
-  mutate(hs = grepl("\\bHS\\b", school))
+  mutate(hs = grepl("\\bHS\\b", school)) %>%
+  #filter to only have the June Amateur draft included
+  filter(draft_type == "JR")
 
 #join the drafts data with the debut data; clean and organize data 
 joined <- draftdata519 %>%
   left_join(debuts, by = c("name_first_last" = "Name", "birth_date" = "Birthdate"))
+
 joined <- joined %>%
   select(name_first_last, name_last_first, primary_position, bats, throws, birth_date, weight, team_full, team_abbrev, league_full, school, hs, avg, hr, rbi, so, sb, w, l, era, sv,
-           year, overall, round, pick, round_sort, round_desc, draft_type, description,mlb_g, milb_g, Debut, `Last Game`, WAR, Birthplace)
+year, overall, round, pick, round_sort, round_desc, draft_type, description,mlb_g, milb_g, Debut, `Last Game`, WAR, Birthplace)
+
 joined$Debut <- as.Date(joined$Debut)
 joined$`Last Game` <- as.Date(joined$`Last Game`)
 ```
@@ -95,15 +102,11 @@ newdata <- newdata %>% select(-draftmonth, -draftday)
 
 newdata = newdata %>% mutate(timetodraft = Debut - draftdate)
 
-#filter to only have the June Amateur draft included 
-newdata <- newdata %>%
-  filter(draft_type == "JR")
-
-newdata
-
 #change timetodraft variable to be an integer intead of a <time>
-# newdata$timetodraft <- as.integer(newdata$timetodraft)
+newdata$timetodraft <- as.integer(newdata$timetodraft)
 ```
+
+## Build models
 
 Fit a weibull model that models a player's length of time between draft and debut. Create one filtering for only players that debuted, and one that includes right censoring. 
 ```{r}
@@ -124,6 +127,8 @@ What if we were to only use include the HS variable in this model?
 curve( 1-pweibull( x , shape=1/0.4144201, scale=exp(7.4055014)), xlim = c(0, 3000), ylim = c(0,1))
 curve( 1-pweibull( x , shape=1/0.4144201, scale=exp(7.4055014+0.2140858)),add=TRUE, col="blue")
 ```
+
+## Analyze the distribution of debut times
 
 Find how long it took a player to reach the majors given that they reached the majors.
 ```{r}
