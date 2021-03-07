@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 Load in libraries for data analysis
-```{r}
+```{r warning=FALSE}
 library(Lahman)
 library(XML)
 library(ggplot2)
@@ -123,6 +123,47 @@ What if we were to only use include the HS variable in this model?
 (weibMlbOnlyhs = survreg(Surv(timetodraft) ~ hs , dist = "weibull" , data = debutedplayers))
 curve( 1-pweibull( x , shape=1/0.4144201, scale=exp(7.4055014)), xlim = c(0, 3000), ylim = c(0,1))
 curve( 1-pweibull( x , shape=1/0.4144201, scale=exp(7.4055014+0.2140858)),add=TRUE, col="blue")
+```
+
+Find how long it took a player to reach the majors given that they reached the majors.
+```{r}
+# select June Amateur draftees drafted between 2005-2010, add hs variable, and keep latest draft year
+draftdata05to10 <- draftdata %>%
+  filter(2005 <= year & year <= 2010) %>%
+  filter(draft_type == "JR") %>%
+  mutate(hs = grepl("\\bHS\\b", school)) %>%
+  # keep latest draft year
+  group_by(name_first_last, birth_date) %>%
+  filter(year == max(year))
+
+# left join with debuts and reorder columns
+draftdata05to10 <- draftdata05to10 %>%
+  left_join(debuts, by = c("name_first_last" = "Name", "birth_date" = "Birthdate")) %>%
+  select(name_first_last, name_last_first, primary_position, bats, throws, birth_date, weight,
+         team_full, team_abbrev, league_full, school, hs, avg, hr, rbi, so, sb, w, l, era, sv,
+         year, overall, round, pick, round_sort, round_desc, draft_type, description,mlb_g,
+         milb_g, Debut, `Last Game`, WAR, Birthplace, Age)
+
+# create draftdate and timetodebut variables
+draftdata05to10 <- draftdata05to10 %>%
+  mutate(draftdate = as.Date(paste(year, "6", "10", sep="-"), "%Y-%m-%d")) %>%
+  mutate(across(where(is.POSIXct), as.Date)) %>%
+  mutate(timetodebut = as.numeric(Debut - draftdate))
+```
+
+Let's look at the data and keep only the players who have a debut date.
+```{r}
+# mlb_g and Debut are slightly off due to name mismatches
+sum(draftdata05to10$mlb_g == "Y")
+sum(!is.na(draftdata05to10$Debut))
+
+# here are players who reached the majors but are missing a debut date because of mismatches
+# e.g. "John Mayberry Jr." in draftdata vs "John Mayberry" in drafts
+draftdata05to10 %>%
+  filter(mlb_g == "Y" & is.na(Debut))
+
+# keep players who have a debut date
+draftdata05to10 = draftdata05to10 %>% filter(!is.na(Debut))
 ```
 
 
