@@ -1,0 +1,129 @@
+---
+title: "Stat 453 Project Rough Draft"
+author: "Erin Franke"
+date: "3/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load in libraries for data analysis
+```{r}
+library(Lahman)
+library(XML)
+library(ggplot2)
+library(plyr)
+library(tidyr)
+library(broom)
+library(tidyverse)
+library(dplyr)
+library(car)
+library(data.table)
+library(stringr)
+library(alluvial)
+library (glmnet)
+library(readr)
+library(lubridate)
+library(readxl)
+library(writexl)
+library(survival)
+library(survminer)
+```
+
+
+Read in the draft data. This gives all players drafted from 1965 to 2019. Also read in the debut excel file, which gives all MLB debuts from 2005 to 2019. 
+```{r}
+draftdata <- read_csv("draft_1965_2019-2.csv") 
+debuts <- read_xlsx("2005-2019 Debuts.xlsx")
+```
+
+Filter and clean the draft data, then join it with the debut data, keeping all players that were drafted between 2005 and 2019 but did not debut. Reorder the columns in the joined data set to make them easier to read and make appropriate columns be dates. 
+```{r}
+#change the draftdata birth_date column to be a date format and filter for draft years during and after 2005. Additionally, define a logical variable "hs" that is TRUE if the player was drafted out of high school. This is done by searching for "HS" in school using a regular expression. 
+draftdata$birth_date <- as.Date(draftdata$birth_date)
+draftdata519 <- draftdata %>%
+  filter(year >= 2005 ) %>%
+  mutate(hs = grepl("\\bHS\\b", school))
+
+#join the drafts data with the debut data; clean and organize data 
+joined <- draftdata519 %>%
+  left_join(debuts, by = c("name_first_last" = "Name", "birth_date" = "Birthdate"))
+joined <- joined %>%
+  select(name_first_last, name_last_first, primary_position, bats, throws, birth_date, weight, team_full, team_abbrev, league_full, school, hs, avg, hr, rbi, so, sb, w, l, era, sv,
+           year, overall, round, pick, round_sort, round_desc, draft_type, description,mlb_g, milb_g, Debut, `Last Game`, WAR, Birthplace)
+joined$Debut <- as.Date(joined$Debut)
+joined$`Last Game` <- as.Date(joined$`Last Game`)
+```
+
+In order to have a proper analysis, we must also remove player duplicates. These players were drafted multiple times - we will take their latest draft year. 
+```{r}
+joined = joined %>% mutate(newid1 = paste(name_first_last,birth_date) , newid2=paste(name_first_last,birth_date,year))
+LatestDraftYear = joined %>% group_by(newid1) %>% summarize(maxyear = max(year)) %>% mutate( newid2=paste(newid1,maxyear) )
+newdata = left_join(LatestDraftYear,joined)
+```
+
+Recode the mlb_g and milb_g variable to make Y as 1 and N as 0. 
+```{r}
+#record mlb_g and milb_g
+newdata$mlb_g <- newdata$mlb_g %>%
+  str_replace_all("Y", "1") %>%
+  str_replace_all("N", "0") %>%
+  as.integer(newdata$mlb_g)
+newdata$milb_g <- newdata$milb_g %>%
+  str_replace_all("Y", "1") %>%
+  str_replace_all("N", "0") %>%
+  as.integer(newdata$milb_g)
+```
+
+In order to allow for right censoring later on, replace all that have not made their debut in the mlb with a debut data of Sep 30, 2019. Create a variable called timetodraft that the represents the length of time between debut and draft date in days.  
+```{r}
+#the most recent debut in this data is Sep 27, 2019
+newdata %>%
+  arrange(desc(Debut))
+
+#replace na in debut with a value of Sep 30, 2019
+newdata$Debut <- replace_na(newdata$Debut, "2019-09-30") 
+
+#create the time until draft variable
+newdata$draftmonth <- rep(06,nrow(newdata)) 
+newdata$draftday <- rep(10, nrow(newdata))
+
+newdata$draftdate<-as.Date(with(newdata,paste(year,draftmonth,draftday,sep="-")),"%Y-%m-%d")
+newdata <- newdata %>% select(-draftmonth, -draftday)
+
+newdata = newdata %>% mutate(timetodraft = Debut - draftdate)
+
+#filter to only have the June Amateur draft included 
+newdata <- newdata %>%
+  filter(draft_type == "JR")
+
+newdata
+
+#change timetodraft variable to be an integer intead of a <time>
+# newdata$timetodraft <- as.integer(newdata$timetodraft)
+```
+
+Fit a weibull model that models a player's length of time between draft and debut. Create one filtering for only players that debuted, and one that includes right censoring. 
+```{r}
+#fit and plot weibull model that uses right censoring 
+(weiballplayers = survreg(Surv(timetodraft, mlb_g) ~ 1 , dist = "weibull" , data = newdata))
+curve( 1-pweibull( x , shape=1/0.8565816 , scale=exp(9.774704)), xlim = c(0, 5000), ylim = c(0,1))
+
+#fit weibull model that only includes players that debuted 
+debutedplayers <- newdata %>%
+  filter(mlb_g == 1)
+(weibMlbOnly = survreg(Surv(timetodraft) ~ 1 , dist = "weibull" , data = debutedplayers))
+curve( 1-pweibull( x , shape=1/0.4209225 , scale=exp(7.461209 )), xlim = c(0, 3000), ylim = c(0,1))
+```
+
+What if we were to only use include the HS variable in this model? 
+```{r}
+(weibMlbOnlyhs = survreg(Surv(timetodraft) ~ hs , dist = "weibull" , data = debutedplayers))
+curve( 1-pweibull( x , shape=1/0.4144201, scale=exp(7.4055014)), xlim = c(0, 3000), ylim = c(0,1))
+curve( 1-pweibull( x , shape=1/0.4144201, scale=exp(7.4055014+0.2140858)),add=TRUE, col="blue")
+```
+
+
+
