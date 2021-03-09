@@ -1,15 +1,18 @@
 ---
 title: "Survival Analysis Project"
-author: "Erin Franke"
+author: "Erin Franke and Corey Pieper"
 date: "2/1/2021"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_float: true
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r warning=FALSE}
+```{r message=FALSE, warning=FALSE}
 library(Lahman)
 library(XML)
 library(ggplot2)
@@ -70,7 +73,7 @@ count(draftdata519, draft_type)
 count(draftdata519, mlb_g)
 ```
 
-### Visualizations
+## Visualizations
 
 ```{r}
 # create a new data set of players drafted between 2000-2010 for some exploratory data analysis
@@ -78,7 +81,11 @@ draftdata00to10 <- draftdata %>%
   filter(draft_type == "JR") %>%
   filter(year >= 2000 & year <= 2010) %>%
   mutate(hs = grepl("\\bHS\\b", school))
+```
 
+### MLB debuts by round
+
+```{r}
 # Proportion that reach MLB by round number, drafted in 2005+
 draftdata519 %>%
   filter(round_sort <= 30 & draft_type == "JR") %>%
@@ -92,6 +99,8 @@ draftdata00to10 %>%
   geom_bar(position = "fill")
 
 ```
+
+### MLB debuts by round and high school
 
 ```{r}
 # Proportion drafted out of HS by round number
@@ -117,6 +126,8 @@ draftdata00to10 %>%
   facet_wrap(. ~ hs)
 ```
 
+### Positions
+
 ```{r}
 # see how many players are drafted at each position
 count(draftdata00to10, primary_position) %>% arrange(desc(n))
@@ -131,6 +142,8 @@ draftdata00to10 <- draftdata00to10 %>%
   filter(primary_position %in% keep_positions)
 ```
 
+### MLB debuts by position and batting hand
+
 ```{r}
 # Proportion that reach MLB by position
 draftdata00to10 %>%
@@ -141,7 +154,7 @@ draftdata00to10 %>%
 # Proportion that reach MLB by batting hand
 draftdata00to10 %>%
   filter(round_sort <= 20) %>%
-  # remove pitchers from the data
+  # remove pitchers from the data, e.g. SP, RHP, LHP, RP
   filter(!str_ends(primary_position, "P")) %>%
   filter(bats != "") %>%
   ggplot(aes(x = bats, fill = mlb_g)) +
@@ -149,14 +162,19 @@ draftdata00to10 %>%
 
 count(draftdata00to10, bats) %>% arrange(desc(n))
 
-count(draftdata00to10, school) %>% arrange(desc(n))
+# see which schools produce the most draft picks
+count(draftdata00to10, school) %>%
+  arrange(desc(n)) %>%
+  head(20)
 
+# how about which schools produce the most 1st and 2nd round draft picks
 draftdata00to10 %>%
   filter(round_sort <= 2) %>%
   count(., school) %>%
-  arrange(desc(n))
+  arrange(desc(n)) %>%
+  head(20)
 
 ```
 
-Test One
+
 
