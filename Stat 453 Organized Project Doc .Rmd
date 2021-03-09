@@ -1,0 +1,378 @@
+---
+title: "Organized Project doc"
+author: "Erin Franke"
+date: "3/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load in libraries for data analysis
+```{r}
+library(Lahman)
+library(XML)
+library(ggplot2)
+library(tidyr)
+library(broom)
+library(tidyverse)
+library(dplyr)
+library(car)
+library(data.table)
+library(stringr)
+library(alluvial)
+library (glmnet)
+library(readr)
+library(lubridate)
+library(readxl)
+library(writexl)
+library(survival)
+library(survminer)
+
+CoxSnell = function( cs, status, xlim=NULL, ylim=NULL )
+{
+kmcs = survfit( Surv(jitter(cs,amount=(max(cs)-min(cs))/1000),status) ~ 1 )$surv
+plot( log(-log(kmcs)) ~ sort(log(cs)) ,
+      xlab="log(Cox-Snell)", ylab="log(-log(S(Cox-Snell)))", xlim=xlim, ylim=ylim )
+abline( 0, 1, col='red' )
+}
+
+AUCKM = function(survobj,duration)
+{
+base=c(0,summary(survobj)$time,max(duration))
+heights=c(1,summary(survobj)$surv)
+new=c()
+for(i in 1:length(heights)) { new=c(new,(base[i+1]-base[i])*heights[i]) }
+c(sum(new))
+}
+```
+
+Read in the draft data. This gives all players drafted from 1965 to 2019. Also read in the debut excel file, which gives all MLB debuts from 2005 to 2019. 
+```{r}
+draftdata <- read_csv("draft_1965_2019-2.csv") 
+debuts <- read_xlsx("2005-2019 Debuts.xlsx")
+```
+
+Filter and clean the draft data, then join it with the debut data, keeping all players that were drafted between 2005 and 2019 but did not debut. Reorder the columns in the joined data set to make them easier to read and make appropriate columns be dates. 
+```{r}
+#change the draftdata birth_date column to be a date format and filter for draft years during and after 2005. Additionally, define a logical variable "hs" that is TRUE if the player was drafted out of high school. This is done by searching for "HS" in school using a regular expression. 
+draftdata$birth_date <- as.Date(draftdata$birth_date)
+draftdata519 <- draftdata %>%
+  filter(year >= 2005 ) %>%
+  mutate(hs = grepl("\\bHS\\b", school))
+
+#join the drafts data with the debut data; clean and organize data 
+joined <- draftdata519 %>%
+  left_join(debuts, by = c("name_first_last" = "Name", "birth_date" = "Birthdate"))
+joined <- joined %>%
+  select(name_first_last, name_last_first, primary_position, bats, throws, birth_date, weight, team_full, team_abbrev, league_full, school, hs, avg, hr, rbi, so, sb, w, l, era, sv,
+           year, overall, round, pick, round_sort, round_desc, draft_type, description,mlb_g, milb_g, Debut, `Last Game`, WAR, Birthplace)
+joined$Debut <- as.Date(joined$Debut)
+joined$`Last Game` <- as.Date(joined$`Last Game`)
+```
+
+In order to have a proper analysis, we must also remove player duplicates. These players were drafted multiple times - we will take their latest draft year. 
+```{r}
+joined = joined %>% mutate(newid1 = paste(name_first_last,birth_date) , newid2=paste(name_first_last,birth_date,year))
+LatestDraftYear = joined %>% group_by(newid1) %>% summarize(maxyear = max(year)) %>% mutate( newid2=paste(newid1,maxyear) )
+newdata = left_join(LatestDraftYear,joined)
+```
+
+Recode the mlb_g and milb_g variable to make Y as 1 and N as 0. 
+```{r}
+#record mlb_g and milb_g
+newdata$mlb_g <- newdata$mlb_g %>%
+  str_replace_all("Y", "1") %>%
+  str_replace_all("N", "0") %>%
+  as.integer(newdata$mlb_g)
+newdata$milb_g <- newdata$milb_g %>%
+  str_replace_all("Y", "1") %>%
+  str_replace_all("N", "0") %>%
+  as.integer(newdata$milb_g)
+```
+
+Due to names not matching perfectly when combining data sets, there are some players that do not have a debut listed. I removed these players from the data to avoid confusion and incorrect results.
+```{r}
+newdata <- read_xlsx("newdatafix.xlsx")
+newdata <- newdata[rowSums(is.na(newdata)) != ncol(newdata),]
+```
+
+In order to allow for right censoring later on, replace all that have not made their debut in the mlb with a debut data of Sep 30, 2019. Do this for players that were drafted after 2011 (for players drafted before, add 8 years to their draft date). Create a variable called timetodraft that the represents the length of time between debut and draft date in days.  
+```{r}
+#create the draftdate and time until draft variable
+newdata$draftmonth <- rep(06,nrow(newdata)) 
+newdata$draftday <- rep(10, nrow(newdata))
+newdata$draftdate<-as.Date(with(newdata,paste(year,draftmonth,draftday,sep="-")),"%Y-%m-%d")
+newdata <- newdata %>% select(-draftmonth, -draftday)
+
+#use EXCEL to fix years add add 8 years to players 
+#write_xlsx(newdata, "ndfixyear.xlsx")
+newdata <- read_xlsx("ndfixyear.xlsx")
+
+newdata = newdata %>% mutate(timetodebut = Debut - draftdate)
+
+#filter to only have the June Ameteur draft included 
+newdata <- newdata %>%
+  filter(draft_type == "JR")
+
+#change timetodraft variable to be an integer intead of a <time>
+newdata$timetodebut <- as.integer(newdata$timetodebut)
+```
+
+Create a logistic regression model that predicts a player's change of making the majors based on being drafted in high school versus college, position, batting hand.
+```{r}
+newdata <- newdata %>% mutate(pitcher = primary_position %in% c("LHP", "P", "RHP", "RP", "SP")) %>% 
+  mutate(catcher = primary_position %in% c("2", "C")) %>%
+  mutate(firstbase = primary_position == "1B") %>%
+  mutate(secondbase = primary_position == "2B") %>%
+  mutate(thirdbase = primary_position %in% c("3B", "5")) %>%
+  mutate(shortstop = primary_position %in% c("SS", "6")) %>%
+  mutate(outfield = primary_position %in% c("CF", "8","RF", "LF", "OF" )) %>%
+  mutate(position = "")
+
+newdata%>%
+  group_by(primary_position) %>%
+  count()
+
+newdata$position[newdata$pitcher == TRUE] <- "pitcher"
+newdata$position[newdata$catcher == TRUE] <- "catcher"
+newdata$position[newdata$firstbase == TRUE] <- "firstbase"
+newdata$position[newdata$secondbase == TRUE] <- "secondbase"
+newdata$position[newdata$thirdbase == TRUE] <- "thirdbase"
+newdata$position[newdata$shortstop == TRUE] <- "shortstop"
+newdata$position[newdata$outfield == TRUE] <- "outfield"
+
+glm.mlb.predictor <- glm(mlb_g ~ hs + bats + position, data = newdata, family = binomial())
+glm.mlb.predictor %>% coef() %>% exp()
+```
+
+Out of the 16,727 players that we have data on that were drafted between 2005 and 2019, 1365 college players debuted and 399 high school draftees debuted in the majors. 10.55% of college draftees debuted in the majors, and 10.528% of high school draftees debuted in the majors - the percentages are almost exactly even!! However, going forward we will only analyze the distribution of players that debuted between 2005 and 2012, because we calculated that 95% of debuts occur within 8 years of draft date, so if we were to analyze that players from draft years starting in 2012 up to 2019, we would be ignoring a portion of players that were drafted and yet to debut. 
+
+Create debutedplayers, which is a data set of of the 1152 players that debuted between 2005 and 2011 that we have data on. 
+```{r}
+debutedplayers <- newdata %>%
+  filter(mlb_g == 1) %>%
+  filter(maxyear < 2012)
+```
+
+We can create Kaplan-Meier curves to model the time to debut lengths of our distribution, separated by high school draftees versus college. The blue line represents players drafted in college; the red line represents players drafted in high school. 
+```{r}
+#KM curves for high schools versus college including censoring - red=primarily college draftees, blue = high school
+KMhs =survfit(Surv(timetodebut, mlb_g)~hs, data=newdata)
+plot(KMhs, conf.int = FALSE, xlab = "Days to Debut", ylab = "Cumulative Proportion", col = c("blue", "red"))
+legend(3100, 0.8, legend = c("college", "high school"), col=c("blue", "red"),lty=1,cex=0.8)
+title("Kaplan-Meier curves for all drafted players 2005-2019")
+
+#KM curves for high schools versus college only including players that made it to the MLB
+KMhsdebuted =survfit(Surv(timetodebut, mlb_g)~hs, data=debutedplayers)
+plot(KMhsdebuted, conf.int = FALSE, xlab = "Days to Debut", ylab = "Cumulative Proportion", col = c("blue", "red"))
+legend(3100, 0.8, legend = c("college", "high school"), col=c("blue", "red"),lty=1,cex=0.8)
+title("Kaplan-Meier curves for 2005-2011 debuted players")
+```
+
+When we only include players that debuted using the debuted players data set, we find that the mean time to debut is 1587.4 days (4.346 years), with a median of 1498 days (4.1 years). Additionally, the mean debut time for players that were drafted in high school is 1923.073 days and for players drafted in college is 1483.154 days. 
+```{r}
+KMmlbOnly = survfit(Surv(timetodebut)~1, data=debutedplayers)
+KMmlbOnly
+AUCKM(KMmlbOnly, debutedplayers$timetodebut)
+
+#high school
+hsdebuts <- debutedplayers %>%
+  filter(hs ==0)
+hskm = survfit(Surv(timetodebut, mlb_g)~1, data=hsdebuts)
+AUCKM(hskm, hsdebuts$timetodebut)
+
+#college
+collegedebuts <- debutedplayers %>%
+  filter(hs ==1)
+colkm = survfit(Surv(timetodebut, mlb_g)~1, data=collegedebuts)
+AUCKM(colkm, collegedebuts$timetodebut)
+```
+
+We can additionally break down time to debut times by position for players that made it to the MLB. We first will filter for players that had a standard position (pitcher, catcher, first, second, third, shortstop, or outfield) listed. 
+```{r}
+debutedplayerspos <- debutedplayers %>%
+  filter(position %in% c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield"))
+KMpos =survfit(Surv(timetodebut, mlb_g)~position, data=debutedplayerspos)
+plot(KMpos, conf.int = FALSE, xlab = "Days to Debut", ylab = "Cumulative Proportion", col = c("red", "orange", "yellow", "green", "blue", "pink", "purple"))
+legend(3000,0.85,legend=c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield"),col=c("red", "orange", "yellow", "green", "blue", "pink", "purple"),lty=1,cex=0.8)
+title("Kaplan-Meier curves for 2005-2011 debuted players by position")
+```
+
+Find the mean time to debut for each of the seven positions using the AUCKM function: 
+```{r}
+#pitchers
+pitchers <- debutedplayers %>%
+  filter(position == "pitcher")
+KMpitch = survfit(Surv(timetodebut, mlb_g)~1, data=pitchers)
+AUCKM(KMpitch, pitchers$timetodebut)
+#catcher
+catchers <- debutedplayers %>%
+  filter(position == "catcher")
+KMcatch = survfit(Surv(timetodebut, mlb_g)~1, data=catchers)
+AUCKM(KMcatch, catchers$timetodebut)
+#firstbase
+firstbase <- debutedplayers %>%
+  filter(position == "firstbase")
+KMfirst = survfit(Surv(timetodebut, mlb_g)~1, data=firstbase)
+AUCKM(KMfirst, firstbase$timetodebut)
+#secondbase
+secondbase <- debutedplayers %>%
+  filter(position == "secondbase")
+KMsecond = survfit(Surv(timetodebut, mlb_g)~1, data=secondbase)
+AUCKM(KMsecond, secondbase$timetodebut)
+#thirdbase
+thirdbase <- debutedplayers %>%
+  filter(position == "thirdbase")
+KMthird = survfit(Surv(timetodebut, mlb_g)~1, data=thirdbase)
+AUCKM(KMthird, thirdbase$timetodebut)
+#shortstop
+shortstop <- debutedplayers %>%
+  filter(position == "shortstop")
+KMshort = survfit(Surv(timetodebut, mlb_g)~1, data=shortstop)
+AUCKM(KMshort, shortstop$timetodebut)
+#outfield
+outfield <- debutedplayers %>%
+  filter(position == "outfield")
+KMout = survfit(Surv(timetodebut, mlb_g)~1, data=outfield)
+AUCKM(KMout, outfield$timetodebut)
+```
+
+
+Mean time to debuts: \
+Pitcher: 1570.038 \
+Catcher: 1752.882 \
+First base: 1507.86 \
+Second base: 1442.419 \
+Third base: 1422.236 \
+Short stop: 1623.946 \
+Outfield: 1637.829 \
+
+We can create a Cox-Snell residual plot to see which parametric regression model fits our data best. It ends up being the weibull: 
+```{r}
+#residual plot for debuted players 
+survreg( Surv(timetodebut,mlb_g) ~hs+bats+position , dist='weibull' , data=debutedplayers )
+CSmore = -log( 1-pweibull( debutedplayers$timetodebut , shape=1/0.3802208, scale=exp(7.56869782) ) )
+CoxSnell( CSmore , debutedplayers$mlb_g )
+title("Cox Snell Residual Plot for Weibull model")
+```
+
+We can confirm that a weibull model using hs, bats, and position is the best predictor of time to debut using the AIC test. 
+```{r}
+#AIC with bats, position, and hs
+survreg( Surv(timetodebut,mlb_g) ~hs + bats + position , dist='weibull' , data=debutedplayers )$loglik[2]
+10 - 2*-9047.619 
+#AIC with position and hs
+survreg( Surv(timetodebut,mlb_g) ~hs + position , dist='weibull' , data=debutedplayers )$loglik[2]
+8-2*-9049.129
+```
+
+The log ratio test says that model that only includes hs and position may be a better choice: 
+```{r}
+2*(-9047.619--9049.129)
+1-pchisq(3.02, df=1)
+```
+
+Fit a weibull model that includes all players, modeling time until debut with censoring. This model will not be incredibly accurate at predicting mean time until debut. The red line represents players drafted in high school; the blue line represents players drafted in college. 
+```{r}
+#fit and plot weibull model that uses right censoring 
+(weiballplayers = survreg(Surv(timetodebut, mlb_g) ~ hs + bats + position , dist = "weibull" , data = newdata))
+curve( 1-pweibull( x , shape=1/0.7009289 , scale=exp(8.10444130)), xlim = c(0, 8000), ylim = c(0,1),  xlab = "Days to Debut", ylab = "Cumulative Proportion", col = "blue")
+curve(1-pweibull(x, shape=1/0.7009289, scale=exp(8.10444130+0.05526795)), add=TRUE, col = "red")
+legend(6000, 0.8, legend = c("college", "high school"), col=c("blue", "red"),lty=1,cex=0.8)
+title("Weibull model for draft-to-debut time for all players drafted 2005-2019")
+
+#fit weibull model that only includes players that debuted.  
+(weibMlbOnly = survreg(Surv(timetodebut) ~ hs + bats + position , dist = "weibull" , data = debutedplayers))
+curve( 1-pweibull( x , shape=1/0.3802208, scale=exp(7.56869782)), xlim = c(0, 3000), ylim = c(0,1),  xlab = "Days to Debut", ylab = "Cumulative Proportion", col = "blue")
+curve( 1-pweibull( x , shape=1/0.3802208, scale=exp(7.56869782+ 0.20817010)), add=TRUE, col = "red")
+legend(2200, 0.8, legend = c("college", "high school"), col=c("blue", "red"),lty=1,cex=0.8)
+title("Weibull model for draft-to-debut time for players debuting 2005-2011")
+```
+
+Find mean time until debut for the weibull model of high school versus college: 
+```{r}
+wcol= function(x) 1-pweibull(x, shape=1/0.3802208, scale=exp(7.56869782))
+integrate(wcol, 0, Inf )
+
+whs = function(x) 1-pweibull(x, shape=1/0.3802208, scale=exp(7.56869782+0.20817010))
+integrate(whs, 0, Inf)
+```
+
+The weibull predicts mean times until debut to be a bit higher than the Kaplan-Meier curve, at 1720.725 days for college draftees and 2118.939 days for high school draftees. 
+
+Log Rank test for the high school variable using only players that have made their debut: 
+```{r}
+survdiff( Surv(timetodebut,mlb_g) ~ hs , data=debutedplayers)
+1- pchisq(58.1 , df=1 )
+
+#point and interval estimate
+(879/756)/(273/396) 
+1.686552*exp( -1.96*sqrt( 1/756 + 1/396))
+1.686552*exp( 1.96*sqrt( 1/756 + 1/396))
+```
+
+Test statistic for Mantel-Cox log-rank test: 58.1 \
+P-value for Mantel-Cox log-rank test: 2.4869e-14 \ 
+There is strong evidence that there is a difference in time to debut for players debuting in high school versus college. \
+The point estimate of the HR is 1.686552, with a 95% confidence interval of (1.493471, 1.904595). We estimate that college players have about a 1.687x greater chance of making it to the MLB at a given time point, given that the players will debut in the future. **check this interpretation.\
+
+Log-rank test for the position variable using only players that have made their debut: 
+```{r}
+survdiff( Surv(timetodebut,mlb_g) ~ position , data=debutedplayerspos)
+1-pchisq(11.81, df=6)
+```
+
+Null hypothesis: position is not a signficant predictor when modeling time until debut \
+Alternative hypothesis: position is a signficant predictor when modeling time until debut \
+Test statistic: 11.81\
+P-value: 0.06634 \
+Conclusion: There is borderline significance - however, there is evidence that catchers, third basemen, and second basemen have noteably longer/shorter times to debut that first base, pitchers, shortstops, and outfielders. 
+
+Log-normal hazard function for high school versus college: 
+```{r}
+mlnhs = survreg( Surv(timetodebut,(mlb_g))~hs, dist ='lognormal', data=debutedplayers)
+summary(mlnhs)
+
+hazcollegeln = function(x) dlnorm(x, 7.1956,  0.473)/(1-plnorm(x, 7.1956,  0.473))
+curve(hazcollegeln, from=0, to=3000, ylab="Hazard" , xlab="Days", col = "blue" )
+
+hazhsln = function(x) dlnorm(x, 7.1956 + 0.3138,  0.473)/(1-plnorm(x, 7.1956 + 0.3138,  0.473))
+curve(hazhsln, add=TRUE, col = "red" )
+legend(2200, 0.0005, legend = c("college", "high school"), col=c("blue", "red"),lty=1,cex=0.8)
+title("Hazard functions for players debuting 2005-2011")
+```
+
+Cox PH model
+```{r}
+(coxmod = coxph(Surv(timetodebut, mlb_g)~position+hs, data = debutedplayerspos))
+plot(survfit(coxmod), ylim=c(0,1), conf.int=FALSE)
+title("COX PH model based on position & hs/college")
+```
+
+Model interpretations: \
+exp(-0.53341)=0.5866 is the HR associated with a 1-unit change in the high school variable (i.e. college draftee to hs draftee) when hs=0. The "risk" of being drafted at a given time point is lower for high school players compared to college players. \
+exp(0.44402)=1.55896 is the HR associated comparing catchers to second basemen. The "risk" of being drafted for second basemen at a given time point is 1.559x that of a catcher. \
+
+The PH assumption is not reasonable for hs as a predictor of timetodebut since the c-log-log transformed Kaplan-Meier curves do not exhibit a constant gap overtime. This is additionally proven by the very small p-value of the test. 
+```{r}
+KMhsdebuted =survfit(Surv(timetodebut, mlb_g)~hs, data=debutedplayers)
+plot( KMhsdebuted, fun='cloglog' , col = c("blue", "red") , mark.time=FALSE )
+legend(100, 0.8, legend = c("college", "high school"), col=c("blue", "red"),lty=1,cex=0.8)
+title("C-log-log plot for hs/college")
+
+hscoxmod = coxph(Surv(timetodebut, mlb_g)~hs, data = debutedplayers)
+cox.zph(hscoxmod)
+```
+
+Similarly, the PH assumption is not valid for position as a predictor of timetodebut since the c-log-log transformed Kaplan-Meier curves do not exhibit a constant gap overtime. However, this PH assumption is better than the one for the high school variable, as seen by the p-value of 0.22.  
+```{r}
+KMposdebuted =survfit(Surv(timetodebut, mlb_g)~position, data=debutedplayers)
+plot( KMposdebuted, fun='cloglog' , col=c("red", "orange", "yellow", "green", "blue", "pink", "purple"), mark.time=FALSE )
+legend(100,0.85,legend=c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield"),col=c("red", "orange", "yellow", "green", "blue", "pink", "purple"),lty=1,cex=0.8)
+
+poscoxmod = coxph(Surv(timetodebut, mlb_g)~position, data = debutedplayers)
+cox.zph(poscoxmod)
+```
+
