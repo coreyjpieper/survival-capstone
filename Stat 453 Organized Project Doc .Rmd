@@ -29,6 +29,7 @@ library(readxl)
 library(writexl)
 library(survival)
 library(survminer)
+library(bookdown)
 
 CoxSnell = function( cs, status, xlim=NULL, ylim=NULL )
 {
@@ -169,6 +170,13 @@ KMhsdebuted =survfit(Surv(timetodebut, mlb_g)~hs, data=debutedplayers)
 plot(KMhsdebuted, conf.int = FALSE, xlab = "Days to Debut", ylab = "Cumulative Proportion", col = c("blue", "red"))
 legend(3100, 0.8, legend = c("college", "high school"), col=c("blue", "red"),lty=1,cex=0.8)
 title("Kaplan-Meier curves for 2005-2011 debuted players")
+
+debutedplayers %>%
+  group_by(hs) %>%
+  count()
+273*1923.073
+1587.4*879
+(524998.9 + 1395325)/(273+879)
 ```
 
 When we only include players that debuted using the debuted players data set, we find that the mean time to debut is 1587.4 days (4.346 years), with a median of 1498 days (4.1 years). Additionally, the mean debut time for players that were drafted in high school is 1923.073 days and for players drafted in college is 1483.154 days. 
@@ -194,7 +202,14 @@ We can additionally break down time to debut times by position for players that 
 ```{r}
 debutedplayerspos <- debutedplayers %>%
   filter(position %in% c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield"))
+
+debutedplayers = debutedplayers %>% mutate(position = factor(position, levels = c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield")))
+
+levels(debutedplayers$position)
+
 KMpos =survfit(Surv(timetodebut, mlb_g)~position, data=debutedplayerspos)
+KMpos
+
 plot(KMpos, conf.int = FALSE, xlab = "Days to Debut", ylab = "Cumulative Proportion", col = c("red", "orange", "yellow", "green", "blue", "pink", "purple"))
 legend(3000,0.85,legend=c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield"),col=c("red", "orange", "yellow", "green", "blue", "pink", "purple"),lty=1,cex=0.8)
 title("Kaplan-Meier curves for 2005-2011 debuted players by position")
@@ -344,16 +359,51 @@ legend(2200, 0.0005, legend = c("college", "high school"), col=c("blue", "red"),
 title("Hazard functions for players debuting 2005-2011")
 ```
 
+e( 0.3138) = how much time longer for a high school player to get to majors compared to a college player \
+
+Hazard functions for position:
+```{r}
+mlnpos = survreg( Surv(timetodebut,(mlb_g))~position, dist ='lognormal', data=debutedplayerspos)
+summary(mlnpos)
+
+hazpitchln = function(x) dlnorm(x, 7.3836-0.13667,  0.488)/(1-plnorm(x, 7.3836-0.13667,  0.488))
+curve(hazpitchln, from=0, to=3000, ylim = c(0, 0.0016), ylab="Hazard" , xlab="Days", col = "red" )
+
+hazcatchln = function(x) dlnorm(x, 7.3836,  0.488)/(1-plnorm(x, 7.3836,  0.488))
+curve(hazcatchln, add=TRUE, col = "orange" )
+
+hazfirstln = function(x) dlnorm(x, 7.3836-0.1340,  0.488)/(1-plnorm(x, 7.3836-0.1340,  0.488))
+curve(hazfirstln, add=TRUE, col = "black" )
+
+hazsecondln = function(x) dlnorm(x, 7.3836-0.1557,  0.488)/(1-plnorm(x, 7.3836-0.1557,  0.488))
+curve(hazsecondln, add=TRUE, col = "green" )
+
+hazthirdln = function(x) dlnorm(x, 7.3836-0.2773,  0.488)/(1-plnorm(x, 7.3836-0.2773,  0.488))
+curve(hazthirdln, add=TRUE, col = "blue")
+
+hazshortln = function(x) dlnorm(x, 7.3836-0.0697,  0.488)/(1-plnorm(x, 7.3836-0.0697,  0.488))
+curve(hazshortln, add=TRUE, col = "pink")
+
+hazoutln = function(x) dlnorm(x, 7.3836-0.0488,  0.488)/(1-plnorm(x, 7.3836-0.0488,  0.488))
+curve(hazoutln, add=TRUE, col = "purple")
+
+legend(2200,0.001,legend=c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield"),col=c("red", "orange", "black", "green", "blue", "pink", "purple"),lty=1,cex=0.8)
+title("Hazard function of debut time based on position")
+```
+
 Cox PH model
 ```{r}
 (coxmod = coxph(Surv(timetodebut, mlb_g)~position+hs, data = debutedplayerspos))
-plot(survfit(coxmod), ylim=c(0,1), conf.int=FALSE)
-title("COX PH model based on position & hs/college")
-```
 
-Model interpretations: \
-exp(-0.53341)=0.5866 is the HR associated with a 1-unit change in the high school variable (i.e. college draftee to hs draftee) when hs=0. The "risk" of being drafted at a given time point is lower for high school players compared to college players. \
-exp(0.44402)=1.55896 is the HR associated comparing catchers to second basemen. The "risk" of being drafted for second basemen at a given time point is 1.559x that of a catcher. \
+new = data.frame(hs = c(0,1), position = c("pitcher", "pitcher"))
+
+plot(survfit(coxmod, newdata=new), ylim=c(0,1), col=c("blue", "red"), conf.int=FALSE)
+title("COX PH model for pitcher & hs/college")
+
+plot(cox.zph(coxmod), resid = FALSE)
+exp(-1)
+exp(-0.1)
+```
 
 The PH assumption is not reasonable for hs as a predictor of timetodebut since the c-log-log transformed Kaplan-Meier curves do not exhibit a constant gap overtime. This is additionally proven by the very small p-value of the test. 
 ```{r}
