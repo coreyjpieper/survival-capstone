@@ -97,12 +97,15 @@
 <h1><span class="header-section-number">1</span> Introduction</h1>
 <div id="background" class="section level2">
 <h2><span class="header-section-number">1.1</span> Background</h2>
+<p>There has been much prior work that has applied survival analysis to baseball, much of it related to predicting career length. <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3184466/">Witnauer, Rogers, and Onge</a> studied the career length of baseball players with respect to their age at the start of their career and what decade they played in. <a href="https://journals.humankinetics.com/view/journals/jsep/17/4/article-p399.xml">Smith and Christensen</a> assessed psychological skills in minor league players and found that they were predictive of current performance and later survival in major league baseball. Besides published research, many others have carried out their own statistical analyses of baseball. The relationship between career length and batting / throwing hand were examined in a <a href="https://www.baseballdatascience.com/survival-analysis-how-long-do-careers-last/">blog post by Micah Melling</a> using Kaplan Meier curves and a Cox proportional hazards model. He found that switch hitters had a much higher survival curve than other hitters, and left-handed hitters had slightly higher survival than right-handed hitters. In another interesting analysis, Scott Spencer studied <a href="https://ssp3nc3r.github.io/post/visual-exploration-of-starting-pitcher-duration/">how long a starting pitcher lasts in a game</a> and looked at performance factors such as runs and baserunners allowed.</p>
 </div>
 <div id="data-sources" class="section level2">
 <h2><span class="header-section-number">1.2</span> Data Sources</h2>
+<p>The data set we used for our analysis combined two data sets, one containing information on MLB drafts and another containing information on player debuts. The draft data set has data on drafts between 1965-2019 and can be found <a href="https://github.com/double-dose-larry/baseball_draft_data">here on GitHub</a> . This data itself was compiled from the <a href="https://appac.github.io/mlb-data-api-docs/">MLB Data API</a>. The debuts data set lists players debuts between 2005-2019 and was manually put together using data from <a href="https://www.baseball-reference.com/">Baseball Reference</a>.</p>
 </div>
 <div id="data-cleaning" class="section level2">
 <h2><span class="header-section-number">1.3</span> Data Cleaning</h2>
+<p>As with any statistical analysis, a significant amount of time was spent getting the data in a usable form. Only the June Amateur Draft is included in our analysis and players drafted since 2005 in order to match the debuts data set. Since far more players are drafted than the number that reach the majors, we left joined the MLB draft data with the debuts data. In addition, because players can be drafted multiple times, we took the most recent draft date for each player.</p>
 
 </div>
 </div>

@@ -1,1 +1,2 @@
 rmd_files: ["index.Rmd", "01-introduction.Rmd", "02-exploration.Rmd", "03-models.Rmd", "04-conclusion.Rmd"]
+output_dir: docs
