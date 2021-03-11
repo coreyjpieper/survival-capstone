@@ -3,6 +3,10 @@
 ## Background
 
 ## Data Sources
+
+The data set we used for our analysis combined two data sets, one containing information on MLB drafts and another containing information on player debuts. The draft data set has data on drafts between 1965-2019 and can be found [here on GitHub](https://github.com/double-dose-larry/baseball_draft_data) . This data itself was compiled from the [MLB Data API](https://appac.github.io/mlb-data-api-docs/). The debuts data set lists players debuts between 2005-2019 and was manually put together using data from [Baseball Reference](https://www.baseball-reference.com/).
   
 ## Data Cleaning
+
+As with any statistical analysis, a significant amount of time was spent getting the data in a usable form. Only the June Amateur Draft is included in our analysis and players drafted since 2005 in order to match the debuts data set. Since far more players are drafted than the number that reach the majors, we left joined the MLB draft data with the debuts data. In addition, because players can be drafted multiple times, we took the most recent draft date for each player.
 
