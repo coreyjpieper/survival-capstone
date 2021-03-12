@@ -1,6 +1,6 @@
 # Exploratory Data Analysis {#exploration}
 
-Before we build any models or perform any survival analysis, we will briefly explore the data set. For this part of the project, we'll mostly look at the subset of players who were drafted from 2000 to 2010 in order to allow sufficient time for players to debut.
+Before we build any models or perform any survival analysis, we will briefly explore the data set and look at how the chance of reaching the majors changes based on different factors. For this part of the project, we'll mostly look at the subset of players who were drafted from 2000 to 2010 in order to allow sufficient time for players to debut.
 
 ```{r, include=FALSE}
 library(ggplot2)
@@ -18,6 +18,7 @@ draftdata00to10 <- draftdata %>%
 ```
 
 ```{r, include=FALSE}
+# calculations
 draftdata00to10 %>%
   filter(milb_g == "Y") %>%  # use milb_g as a proxy for signed players
   # the variable 'signed_sw' also exists but it is not reliable for years < 2009
@@ -30,31 +31,43 @@ draftdata00to10 %>%
   summarize("mlb" = sum(mlb_g == "Y"), "total" = n(), "proportion" = sum(mlb_g == "Y") / n())
 ```
 
-Out of all the players who were drafted between 2000-2010 and played in the minors, only 18.8%
-reached the majors. Players drafted in the 1st round had the highest chance at 70.4%, and players drafted in the 2nd round had the second highest chance at 52.7%. The following bar graph shows in detail the proportion of players who reach the majors by round.
+Out of all the players who were drafted between 2000-2010 and played in the minors, only 18.8% reached the majors. Players drafted in the 1st round had the highest chance at 70.4%, and players drafted in the 2nd round had the second highest chance at 52.7%. The following bar graph shows in detail the proportion of players who reach the majors by round.
 
 ```{r}
 # Proportion that reach MLB by round number, drafted between 2000-2010
 draftdata00to10 %>%
   ggplot(aes(x = round_sort, fill = mlb_g)) +
   geom_bar(position = "fill", alpha = 0.9) +
-  labs(x = "Draft Round", y = "Proportion", title = "Proportion of Drafted Players that Debut (2000-2010)", fill = "MLB")
+  labs(x = "Draft Round", y = "Proportion", title = "Proportion of Drafted Players that Debut", fill = "MLB")
 ```
 
 ```{r, include=FALSE}
+# calculations
 draftdata00to10 %>%
   summarize(sum(hs) / n())
 ```
 
-Next we'll investigate what proportion of players are drafted out of high school vs college by round. Overall, 32.3% of drafted players are drafted out of high school. The bar graph below shows what proportion of players are drafted from high school vs college by round. Interestingly, we see that the proportion of players drafted out of high school decreases and then increases, with the highest levels in rounds 40-50.
+Next we'll investigate what proportion of players are drafted out of high school vs college by round. Overall, 32.3% of drafted players are drafted out of high school. The bar graph below shows what proportion of players are drafted from high school vs college by round. Interestingly, we see that the proportion of players drafted out of high school decreases and then increases, with the highest levels in rounds 40-50. This may be because baseball teams are more willingly to take risks in later rounds since the probability of these players reaching the majors is so low anyway.
 
 ```{r}
 draftdata00to10 %>%
   ggplot(aes(x = round_sort, fill = hs)) +
   geom_bar(position = "fill") +
   labs(x = "Draft Round", y = "Proportion", title = "Proportion of Players Drafted from High School / College") +
- scale_fill_discrete(name = "", labels = c("College", "High School"))
+ scale_fill_discrete(name = "Drafted from", labels = c("College", "High School"))
 ```
 
+An ongoing debates among baseball analysts and front offices is whether to draft high school or college players. Some believe that only college players should be drafted because of the high amount of uncertainty involved with high schools players, and because teams should minimize risk. However, there appears to be a shift between when it is beneficial to draft college players and when it is beneficial to draft high school players:
 
+```{r}
+draftdata00to10 %>%
+  group_by(round_sort, hs) %>%
+  summarize(mlb_freq = sum(ifelse(mlb_g == "Y", 1, 0)) / n()) %>%
+  ggplot(aes(x = round_sort, y = mlb_freq, color = hs)) +
+  geom_smooth(se = FALSE) +
+  geom_point() +
+  labs(x = "Draft Round", y = "Proportion", title = "Proportion of Drafted Players that Debut by High School / College") +
+  scale_color_discrete(name = "Drafted from", labels = c("College", "High School"))
+```
 
+One explanation for this is that the high risk / high reward of high schoolers is a disadvantage in earlier rounds, by an advantage in later rounds. In earlier rounds the risk of injury and washing out for high school players outweighs the benefit of starting in the minors sooner, but in later rounds starting earlier could be the difference between making it to the big leagues or not. High school players who sign on will be foregoing college and thus will be able to dedicate more time to baseball.
