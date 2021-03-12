@@ -2,10 +2,15 @@
 
 Before we build any models or perform any survival analysis, we will briefly explore the data set and look at how the chance of reaching the majors changes based on different factors. For this part of the project, we'll mostly look at the subset of players who were drafted from 2000 to 2010 in order to allow sufficient time for players to debut.
 
+```{r}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
 ```{r, include=FALSE}
 library(ggplot2)
 library(dplyr)
 library(readxl)
+library(lubridate)
 
 draftdata <- read.csv("draft_1965_2019-2.csv") 
 debuts <- read_xlsx("2005-2019 Debuts.xlsx")
@@ -38,7 +43,8 @@ Out of all the players who were drafted between 2000-2010 and played in the mino
 draftdata00to10 %>%
   ggplot(aes(x = round_sort, fill = mlb_g)) +
   geom_bar(position = "fill", alpha = 0.9) +
-  labs(x = "Draft Round", y = "Proportion", title = "Proportion of Drafted Players that Debut", fill = "MLB")
+  labs(x = "Draft Round", y = "Proportion", title = "Proportion of Drafted Players that Debut", fill = "MLB") +
+  scale_fill_manual(values = c("gray", "dodgerblue"))
 ```
 
 ```{r, include=FALSE}
@@ -71,3 +77,57 @@ draftdata00to10 %>%
 ```
 
 One explanation for this is that the high risk / high reward of high schoolers is a disadvantage in earlier rounds, by an advantage in later rounds. In earlier rounds the risk of injury and washing out for high school players outweighs the benefit of starting in the minors sooner, but in later rounds starting earlier could be the difference between making it to the big leagues or not. High school players who sign on will be foregoing college and thus will be able to dedicate more time to baseball.
+
+Finally, we will investigate the time from draft to debut among players. Here we will be using the debuts data set in addition to the draft data set. Also, we will only consider players drafted from 2005-2010, since 2005 is the earliest year for which we have debut information. 
+
+```{r}
+# select June Amateur draftees drafted between 2005-2010, add hs variable, and keep latest draft year
+draftdata05to10 <- draftdata %>%
+  filter(2005 <= year & year <= 2010) %>%
+  filter(draft_type == "JR") %>%
+  mutate(hs = grepl("\\bHS\\b", school)) %>%
+  mutate(birth_date = as.Date(birth_date)) %>%
+  # keep latest draft year
+  group_by(name_first_last, birth_date) %>%
+  filter(year == max(year))
+
+# left join with debuts
+draftdata05to10 <- draftdata05to10 %>%
+  left_join(debuts, by = c("name_first_last" = "Name", "birth_date" = "Birthdate"))
+
+# create draftdate and timetodebut variables
+draftdata05to10 <- draftdata05to10 %>%
+  mutate(draftdate = as.Date(paste(year, "6", "10", sep="-"), "%Y-%m-%d")) %>%
+  mutate(across(where(is.POSIXct), as.Date)) %>%
+  mutate(timetodebut = as.numeric(Debut - draftdate))
+
+# keep players who have a debut date
+draftdata05to10 = draftdata05to10 %>% filter(!is.na(Debut))
+```
+
+```{r}
+draftdata05to10 %>%
+  ggplot(aes(x = timetodebut / 365, group = hs, fill = hs)) +
+  geom_density(alpha = 0.5) +
+  labs(x = "Years", y = "Density", title = "Distribution of Draft to Debut Times") +
+  scale_fill_discrete(name = "Drafted from", labels = c("College", "High School")) +
+  scale_x_continuous(breaks = seq(0, 12, 2))
+```
+
+```{r, include=FALSE}
+# calculations
+mean(draftdata05to10$timetodebut) / 365
+median(draftdata05to10$timetodebut) / 365
+
+# 95% quantile of debuts times is 8.12 years
+quantile(draftdata05to10$timetodebut, 0.95) / 365
+
+draftdata05to10$mlb_g <- if_else(draftdata05to10$mlb_g == "Y", 1, 0)
+
+draftdata05to10 %>%
+  group_by(hs) %>%
+  summarize(debuts = sum(mlb_g), total = n(), "percent debut" = sum(mlb_g) / n())
+```
+
+From the above density plot, we can see that high school players tend to debut 2-3 years after college players. The distribution within each group is roughly symmetric and unimodal. The mean and median time to debut for all players is 4.63 and 4.23 years respectively. The 95% quantile of debuts times is 8.12 years, which we will use later on in our analysis as a cutoff time for censoring individuals.
+
