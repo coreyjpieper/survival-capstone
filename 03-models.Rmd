@@ -30,7 +30,11 @@ c(sum(new))
 ```
 
 <!-- Kaplan Meier -->
-```{r}
+```{r, include=FALSE}
+draftdata <- read_csv("draft_1965_2019-2.csv") 
+debuts <- read_xlsx("2005-2019 Debuts.xlsx")
+
+draftdata$birth_date <- as.Date(draftdata$birth_date)
 draftdata519 <- draftdata %>%
   filter(year >= 2005 ) %>%
   mutate(hs = grepl("\\bHS\\b", school)) %>%
@@ -66,9 +70,7 @@ allplayers <- allplayers %>%
   mutate(timetodebut = as.numeric(Debut - draftdate))
 ```
 
-## Kaplan Meier Curves
-
-```{r}
+```{r, include=FALSE}
 newdata <- read_xlsx("ndfixyear.xlsx")
 
 newdata = newdata %>% mutate(timetodebut = Debut - draftdate)
@@ -79,7 +81,10 @@ newdata <- newdata %>%
 
 #change timetodraft variable to be an integer intead of a <time>
 newdata$timetodebut <- as.integer(newdata$timetodebut)
+
+newdata$position <- 1
 ```
+
 
 ```{r, include=FALSE}
 newdata <- newdata %>% mutate(pitcher = primary_position %in% c("LHP", "P", "RHP", "RP", "SP")) %>% 
@@ -91,9 +96,6 @@ newdata <- newdata %>% mutate(pitcher = primary_position %in% c("LHP", "P", "RHP
   mutate(outfield = primary_position %in% c("CF", "8","RF", "LF", "OF" )) %>%
   mutate(position = "")
 
-newdata%>%
-  group_by(primary_position) %>%
-  count()
 
 newdata$position[newdata$pitcher == TRUE] <- "pitcher"
 newdata$position[newdata$catcher == TRUE] <- "catcher"
@@ -124,6 +126,13 @@ confint(glm.mlb.signed) %>%
 signed %>%
   group_by(hs) %>%
   summarize(debuts = sum(mlb_g), total = n(), "percent debut" = sum(mlb_g) / n())
+
+debutedplayers <- newdata %>%
+  filter(mlb_g == 1) %>%
+  filter(maxyear < 2012)
+debutedplayerspos <- debutedplayers %>%
+  filter(position %in% c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield"))
+debutedplayers = debutedplayers %>% mutate(position = factor(position, levels = c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield")))
 ```
 
 ## Logistic Regression Model
@@ -136,17 +145,61 @@ glm.mlb.predictor %>%
 
 As a result of deciding that the censoring method would not work as a proper analysis for our question, we proceeded with the two step model. The first step of this model seeks to demonstrate a player's probability of debuting in the major leagues based off of their position; whether they bat right handed, left handed, or as a switch hitter; and whether they were drafted in high school or college. Using the 16,727 draftees between 2005 and 2019, we were able to create the following logistic regression model. 
 
-$$\log(\mathrm{Odds}[\mathrm{playing in MLB} \mid \mathrm{position}, \mathrm{battingStance}, \mathrm{highSchool}]) = 0.117 + 0.958  \mathrm{HSdraftee} +  0.82 \mathrm{batsRight}
-+ 1.009 \mathrm{batsSwitch} + 1.375 \mathrm{pitcher} + 1.068 \mathrm{firstbase} + 0.851 \mathrm{secondbase} + 1.406 \mathrm{shortstop} + 1.156 \mathrm{thirdbase} + 0.9 \mathrm{outfield}$$
+$$\log(\mathrm{Odds}[\mathrm{playing in MLB} \mid \mathrm{position}, \mathrm{battingStance}, \mathrm{highSchool}]) = 0.117 + 0.958  \mathrm{HSdraftee}\\
++  0.82 \mathrm{batsRight} + 1.009 \mathrm{batsSwitch} + 1.375 \mathrm{pitcher} + 1.068 \mathrm{firstbase} + 0.851 \mathrm{secondbase}\\
++ 1.406 \mathrm{shortstop} + 1.156 \mathrm{thirdbase} + 0.9 \mathrm{outfield}$$
 
 This model has three significant variables - the right handed batting stance, the pitcher position, and the shortstop position. We can say with 95% confidence that the odds of a right handed batter making their big league debut holding position and whether they were drafted in high school or college constant are between  0.737 and 0.913 times lower than an left handed batter that is drafted. From our model, we also learn that outfielders and second basemen that are drafted tend to have the lowest odds of making their debut holding batting hand and whether they were drafted in high school or college constant. These variables are not significant, however, as the confidence interval representing their slope includes 1. On the other hand, the variables representing shortstops and pitchers are significant. With 95% confidence, we can say drafted pitchers have between 1.148 and 1.657 times the odds of making their major league debut compared to drafted catchers, and drafted shortstops have between 1.116 to 1.774 times the odds compared to drafted catchers (all holding batting hand and high school versus college draft status constant). 
 
 With this model that accounts for all players drafted, we do not have evidence to conclude that high school draftees have a significantly lower probability of debuting than college draftees, as one might expect. However, in addition to this model we decided to create another logistic regression model for predicting whether or not a player will make their debut that only includes players that officially signed with a major league team and uses the same predictor variables. This model is based off of 2228 high school draftees that signed and 11,486 college draftees that signed, and the result is shown below: \
 
-$$\log(\mathrm{Odds}[\mathrm{playing in MLB given signed} \mid \mathrm{position}, \mathrm{battingStance}, \mathrm{highSchool}]) = 0.134 + 1.64  \mathrm{HSdraftee} +  0.808 \mathrm{batsRight}
-+ 0.918 \mathrm{batsSwitch} + 1.314 \mathrm{pitcher} + 0.991 \mathrm{firstbase} + 0.822 \mathrm{secondbase} + 1.283 \mathrm{shortstop} + 1.14 \mathrm{thirdbase} + 0.84 \mathrm{outfield}$$
+$$\log(\mathrm{Odds}[\mathrm{playing in MLB given signed} \mid \mathrm{position}, \mathrm{battingStance}, \mathrm{highSchool}]) = 0.134\\
++ 1.64  \mathrm{HSdraftee} +  0.808 \mathrm{batsRight} + 0.918 \mathrm{batsSwitch} + 1.314 \mathrm{pitcher} + 0.991 \mathrm{firstbase}\\
++ 0.822 \mathrm{secondbase} + 1.283 \mathrm{shortstop} + 1.14 \mathrm{thirdbase} + 0.84 \mathrm{outfield}$$
 
 As we can see from this model, being a signed player drafted in high school significantly increases a player's odds of making their major league debut compared to a signed college player, as the 95% confidence interval represents a 1.45 to 1.859 increase in odds. This is much different than what we found when looking at all drafted players. Similar to the earlier model, the right handed batting predictor variable is significant - a signed player batting right handed has 0.722 to 0.903 times the odds of making their major league debut compared to left handed batters. The shortstop and pitcher positions are no longer significant variables. 
+
+## Kaplan-Meier Curves
+
+The first type of model we will fit is a Kaplan-Meier curve, which gives us a non-parametric estimate of survival. Since it is a non-parametric model, it makes no assumptions about the underlying data and is very flexible. The way that the values on the curve are calculated are through reasoning in a conditional way: at every time point where a failure occurs we ask how many individuals survived past that point out of all the individuals that made it to that point. The below plot shows two separate Kaplan-Meier curves for high school and college players who debuted.
+
+```{r}
+km <- survfit(Surv(timetodebut, mlb_g) ~ hs, data = debutedplayers)
+
+plot(km, xlab = "Days", ylab = "Cumulative Proportion", col = c("blue", "red"))
+legend(3100, 1, legend = c("college", "high school"), col=c("blue", "red"),lty=1,cex=0.8)
+title("Kaplan-Meier Curves for Players Who Debuted")
+```
+
+We see that the survival curve of college players is lower than that of high school players, reflecting that they debut earlier them. However, starting at about 1500 days, or about 4 years, the gap between the curves is decreasing, which reflects the high school players catching up to the college players and debuting at a higher rate then them. The estimate of mean survival time is given by the area under the Kaplan-Meier curve. Here, the mean survival time is 4.06 years for college players and 5.27 for high school players
+
+```{r, include=FALSE}
+#high school
+hsdebuts <- debutedplayers %>%
+  filter(hs == 1)
+hskm = survfit(Surv(timetodebut, mlb_g)~1, data=hsdebuts)
+AUCKM(hskm, hsdebuts$timetodebut) / 365
+
+#college
+collegedebuts <- debutedplayers %>%
+  filter(hs == 0)
+colkm = survfit(Surv(timetodebut, mlb_g)~1, data=collegedebuts)
+AUCKM(colkm, collegedebuts$timetodebut) / 365
+```
+
+We can also create Kaplan-Meier curves based on position:
+
+```{r}
+KMpos =survfit(Surv(timetodebut, mlb_g)~position, data=debutedplayerspos)
+# KMpos
+
+plot(KMpos, conf.int = FALSE, xlab = "Days to Debut", ylab = "Cumulative Proportion", col = c("red", "orange", "yellow", "green", "blue", "pink", "purple"))
+
+legend(3000,0.85,legend=c("catcher", "firstbase", "outfield", "pitcher", "secondbase", "shortstop", "thirdbase"), col=c("red", "orange", "yellow", "green", "blue", "pink", "purple"),lty=1,cex=0.8)
+title("Kaplan-Meier curves for 2005-2011 debuted players by position")
+```
+
+These curves show that third basemen have the shortest times to debut, and second basemen follow a similar trend starting around day 1,000. On the other hand, catchers take the longest time to develop and debut.
 
 ## Weibull Parametric Model for draft to debut times
 
@@ -155,12 +208,6 @@ In addition to modeling the draft to debut times with the Kaplan-Meier curve, we
 Cox-Snell residual plots are one way to determine how good a parametric distribution is for what you are trying to model. If the plotted points appear linear with a slope of one, the model is likely a pretty good fit. We compared exponential, log-normal, normal, and weibull parametric models using Cox-Snell residual plots and found the weibull model to best fit our data, as seen by how closely our transformed data points fit the linear line. 
 
 ```{r}
-debutedplayers <- newdata %>%
-  filter(mlb_g == 1) %>%
-  filter(maxyear < 2012)
-debutedplayerspos <- debutedplayers %>%
-  filter(position %in% c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield"))
-debutedplayers = debutedplayers %>% mutate(position = factor(position, levels = c("pitcher", "catcher", "firstbase", "secondbase", "thirdbase", "shortstop", "outfield")))
 
 #residual plot for debuted players 
 #survreg( Surv(timetodebut,mlb_g) ~hs+bats+position , dist='weibull' , data=debutedplayers )
@@ -203,6 +250,7 @@ title("Hazard functions for players debuting 2005-2011")
 We see from this hazard plot that the college draftee hazard curve lies above the high school draftee curve, meaning that the college players are more likely to make their debut at any given time. Taking the the ratio of the curves at a given time represents how much more likely college players are to debut at that time in comparison to high school draftees - for example, at 1500 days (4.1 years), we can approximate that a college draftee is about 1.6875x more likely to make their debut that day than a high school draftee if they have not already debuted. We can see that from the curves the ratio starts out small then grows larger (at around 1000 days college draftees are about 2x as likely as high school draftees to make their debut on a given day), then decreases again. We can exponentiate the high school coefficient of the hazard function to find on average how much more likely a college draftee is to make their debut than the high school draftee across all times, and get 1.369. However, we should take this with a grain of salt. A problem with these hazard functions is that they tend to become more inaccurate sometime after the 1500 day mark. The curves will never meet/cross, implying that college players are always more likely to debut than high school players. However, we know this is not true. From our logistic regression model based on over 16,000 draftees, we saw there was no significant difference in the probability of a college draftee making it into the MLB compared to a high school draftee.
 
 One way to solve this situation and better assess the difference in "risk" of a debut at any given time was to fit a Cox PH model for the data and then look at the plot of the hazard ratio overtime that is true to the data (no assumptions are being made like with the log-normal hazard functions). This plot is shown below: 
+
 ```{r}
 coxmod = coxph(Surv(timetodebut, mlb_g)~hs, data = debutedplayerspos)
 plot(cox.zph(coxmod), resid = FALSE)
