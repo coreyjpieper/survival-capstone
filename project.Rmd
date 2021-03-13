@@ -105,13 +105,11 @@ draftdata00to10 %>%
 ```{r}
 # Proportion drafted out of HS by round number
 draftdata00to10 %>%
-  filter(round_sort <= 30) %>%
   ggplot(aes(x = round_sort, fill = hs)) +
   geom_bar(position = "fill")
 
 # Proportion that reach MLB by round and HS
 draftdata00to10 %>%
-  filter(round_sort <= 50) %>%
   group_by(round_sort, hs) %>%
   summarize(mlb_freq = sum(ifelse(mlb_g == "Y", 1, 0)) / n()) %>%
   ggplot(aes(x = round_sort, y = mlb_freq, color = hs)) +
@@ -176,5 +174,70 @@ draftdata00to10 %>%
 
 ```
 
+See how many players reached the majors out of the number that played in the minors vs that were drafted.
 
+```{r}
+# see the highest pick number in each round; after ~ round 40 it starts decreasing
+draftdata00to10 %>%
+  filter(year == 2000) %>% 
+  group_by(round_sort) %>% 
+  summarize("max pick" = max(pick))
+
+# calculate the probability of debut using a 10 year average
+draftdata00to10 %>%
+  group_by(round_sort) %>%
+  summarize("signed" = sum(milb_g == "Y"), "debuts" = sum(mlb_g == "Y"), probability = sum(mlb_g == "Y") / sum(milb_g == "Y"), "old prob" = sum(mlb_g == "Y") / n())
+
+# how many players played in the minors
+draftdata00to10 %>%
+  group_by(round_sort) %>%
+  summarize("minors" = sum(milb_g == "Y") / n())
+
+# check if its possible for someone to have mlb == "Y" but milb == "N"
+draftdata00to10 %>%
+  filter(mlb_g == "Y" & milb_g == "N")
+```
+
+In terms of sets, drafted players is a superset of signed players, which is a superset of players who played in the minors, which is a superset of players who played in the majors.
+
+```{r}
+# check distribution of signed_sw
+draftdata00to10 %>%
+  group_by(year) %>%
+  summarize(signed = sum(signed_sw == "Y"))
+
+draftdata %>%
+  filter(1990 <= year) %>%
+  group_by(year) %>%
+  summarize(signed = sum(signed_sw == "Y"))
+```
+
+Something is wrong with pick in year 2002.
+
+```{r}
+draftdata00to10 %>% filter(year == 2002) %>% group_by(round_sort) %>% summarize(pk = max(pick))
+
+# year, round_sort, max(pick)
+# pivot wider
+# year1, year2, year3 ..
+draftdata00to10 %>% group_by(round_sort, year) %>% summarize(maxpick = max(pick)) %>% pivot_wider(names_from = year, values_from = maxpick)
+```
+
+Investigate what proportion of players come from each round.
+
+```{r}
+rounddebuts <- draftdata00to10 %>%
+  group_by(round_sort) %>%
+  summarize(debuts = sum(mlb_g == "Y"))
+
+rounddebuts$proportion = rounddebuts$debuts / sum(rounddebuts$debuts)
+rounddebuts$cum_proportion = cumsum(rounddebuts$proportion)
+
+rounddebuts
+
+draftdata00to10 %>%
+  filter(milb_g == "Y") %>%
+  group_by(hs) %>%
+  summarize(debuts = sum(mlb_g == "Y"), total = n(), "percent debut" = sum(mlb_g == "Y") / n())
+```
 
