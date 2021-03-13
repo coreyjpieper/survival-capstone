@@ -69,12 +69,18 @@
 <li class="chapter" data-level="0.1" data-path="index.html"><a href="index.html#motivation"><i class="fa fa-check"></i><b>0.1</b> Motivation</a></li>
 </ul></li>
 <li class="chapter" data-level="1" data-path="intro.html"><a href="intro.html"><i class="fa fa-check"></i><b>1</b> Introduction</a><ul>
-<li class="chapter" data-level="1.1" data-path="intro.html"><a href="intro.html#background"><i class="fa fa-check"></i><b>1.1</b> Background</a></li>
-<li class="chapter" data-level="1.2" data-path="intro.html"><a href="intro.html#data-sources"><i class="fa fa-check"></i><b>1.2</b> Data Sources</a></li>
-<li class="chapter" data-level="1.3" data-path="intro.html"><a href="intro.html#data-cleaning"><i class="fa fa-check"></i><b>1.3</b> Data Cleaning</a></li>
+<li class="chapter" data-level="1.1" data-path="intro.html"><a href="intro.html#introduction-to-survival-analysis"><i class="fa fa-check"></i><b>1.1</b> Introduction to Survival Analysis</a></li>
+<li class="chapter" data-level="1.2" data-path="intro.html"><a href="intro.html#background"><i class="fa fa-check"></i><b>1.2</b> Background</a></li>
+<li class="chapter" data-level="1.3" data-path="intro.html"><a href="intro.html#data-sources"><i class="fa fa-check"></i><b>1.3</b> Data Sources</a></li>
+<li class="chapter" data-level="1.4" data-path="intro.html"><a href="intro.html#data-cleaning"><i class="fa fa-check"></i><b>1.4</b> Data Cleaning</a></li>
 </ul></li>
 <li class="chapter" data-level="2" data-path="exploration.html"><a href="exploration.html"><i class="fa fa-check"></i><b>2</b> Exploratory Data Analysis</a></li>
-<li class="chapter" data-level="3" data-path="models.html"><a href="models.html"><i class="fa fa-check"></i><b>3</b> Models</a></li>
+<li class="chapter" data-level="3" data-path="models.html"><a href="models.html"><i class="fa fa-check"></i><b>3</b> Models</a><ul>
+<li class="chapter" data-level="3.1" data-path="models.html"><a href="models.html#kaplan-meier-curves"><i class="fa fa-check"></i><b>3.1</b> Kaplan Meier Curves</a></li>
+<li class="chapter" data-level="3.2" data-path="models.html"><a href="models.html#logistic-regression-model"><i class="fa fa-check"></i><b>3.2</b> Logistic Regression Model</a></li>
+<li class="chapter" data-level="3.3" data-path="models.html"><a href="models.html#weibull-parametric-model-for-draft-to-debut-times"><i class="fa fa-check"></i><b>3.3</b> Weibull Parametric Model for draft to debut times</a></li>
+<li class="chapter" data-level="3.4" data-path="models.html"><a href="models.html#an-analysis-comparing-debut-likelihood-using-hazard-functions-and-a-cox-ph-model"><i class="fa fa-check"></i><b>3.4</b> An analysis comparing debut likelihood using hazard functions and a Cox PH model</a></li>
+</ul></li>
 <li class="chapter" data-level="4" data-path="conclusion.html"><a href="conclusion.html"><i class="fa fa-check"></i><b>4</b> Conclusion</a></li>
 </ul>
 
@@ -97,14 +103,14 @@
 <h1><span class="header-section-number">2</span> Exploratory Data Analysis</h1>
 <p>Before we build any models or perform any survival analysis, we will briefly explore the data set and look at how the chance of reaching the majors changes based on different factors. For this part of the project, we’ll mostly look at the subset of players who were drafted from 2000 to 2010 in order to allow sufficient time for players to debut.</p>
 <p>Out of all the players who were drafted between 2000-2010 and played in the minors, only 18.8% reached the majors. Players drafted in the 1st round had the highest chance at 70.4%, and players drafted in the 2nd round had the second highest chance at 52.7%. The following bar graph shows in detail the proportion of players who reach the majors by round.</p>
-<p><img src="_main_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<p><img src="_main_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
 <p>Next we’ll investigate what proportion of players are drafted out of high school vs college by round. Overall, 32.3% of drafted players are drafted out of high school. The bar graph below shows what proportion of players are drafted from high school vs college by round. Interestingly, we see that the proportion of players drafted out of high school decreases and then increases, with the highest levels in rounds 40-50. This may be because baseball teams are more willingly to take risks in later rounds since the probability of these players reaching the majors is so low anyway.</p>
-<p><img src="_main_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+<p><img src="_main_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
 <p>An ongoing debates among baseball analysts and front offices is whether to draft high school or college players. Some believe that only college players should be drafted because of the high amount of uncertainty involved with high schools players, and because teams should minimize risk. However, there appears to be a shift between when it is beneficial to draft college players and when it is beneficial to draft high school players:</p>
-<p><img src="_main_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
+<p><img src="_main_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
 <p>One explanation for this is that the high risk / high reward of high schoolers is a disadvantage in earlier rounds, by an advantage in later rounds. In earlier rounds the risk of injury and washing out for high school players outweighs the benefit of starting in the minors sooner, but in later rounds starting earlier could be the difference between making it to the big leagues or not. High school players who sign on will be foregoing college and thus will be able to dedicate more time to baseball.</p>
 <p>Finally, we will investigate the time from draft to debut among players. Here we will be using the debuts data set in addition to the draft data set. Also, we will only consider players drafted from 2005-2010, since 2005 is the earliest year for which we have debut information.</p>
-<p><img src="_main_files/figure-html/unnamed-chunk-9-1.png" width="672" /></p>
+<p><img src="_main_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
 <p>From the above density plot, we can see that high school players tend to debut 2-3 years after college players. The distribution within each group is roughly symmetric and unimodal. The mean and median time to debut for all players is 4.63 and 4.23 years respectively. The 95% quantile of debuts times is 8.12 years, which we will use later on in our analysis as a cutoff time for censoring individuals.</p>
 
 </div>
@@ -164,6 +170,20 @@ gitbook.start({
 });
 </script>
 
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    var src = "true";
+    if (src === "" || src === "true") src = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML";
+    if (location.protocol !== "file:")
+      if (/^https?:/.test(src))
+        src = src.replace(/^https?:/, '');
+    script.src = src;
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
 </body>
 
 </html>

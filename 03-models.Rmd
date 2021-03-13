@@ -29,6 +29,45 @@ c(sum(new))
 }
 ```
 
+<!-- Kaplan Meier -->
+```{r}
+draftdata519 <- draftdata %>%
+  filter(year >= 2005 ) %>%
+  mutate(hs = grepl("\\bHS\\b", school)) %>%
+  #filter to only have the June Amateur draft included
+  filter(draft_type == "JR")
+
+#join the drafts data with the debut data; clean and organize data 
+joined <- draftdata519 %>%
+  left_join(debuts, by = c("name_first_last" = "Name", "birth_date" = "Birthdate"))
+
+joined <- joined %>%
+  select(name_first_last, name_last_first, primary_position, bats, throws, birth_date, weight, team_full, team_abbrev, league_full, school, hs, avg, hr, rbi, so, sb, w, l, era, sv,
+year, overall, round, pick, round_sort, round_desc, draft_type, description,mlb_g, milb_g, Debut, `Last Game`, WAR, Birthplace)
+
+joined$Debut <- as.Date(joined$Debut)
+joined$`Last Game` <- as.Date(joined$`Last Game`)
+
+# remove duplicates
+allplayers <- joined %>% 
+  group_by(name_first_last, birth_date) %>%
+  filter(year == max(year))
+
+allplayers <- ungroup(allplayers)
+
+#record mlb_g and milb_g
+allplayers$mlb_g <- as.integer(allplayers$mlb_g == "Y")
+allplayers$milb_g <- as.integer(allplayers$milb_g == "Y")
+
+# add censored Debut time
+allplayers <- allplayers %>%
+  mutate(draftdate = as.Date(paste(year, "6", "10", sep="-"), "%Y-%m-%d")) %>%
+  mutate(Debut = if_else(!is.na(Debut), Debut, pmin(draftdate + 2964, as.Date("2019-09-30")))) %>%
+  mutate(timetodebut = as.numeric(Debut - draftdate))
+```
+
+## Kaplan Meier Curves
+
 ```{r}
 newdata <- read_xlsx("ndfixyear.xlsx")
 

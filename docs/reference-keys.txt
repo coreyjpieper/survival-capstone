@@ -1,8 +1,13 @@
 motivation
 intro
+introduction-to-survival-analysis
 background
 data-sources
 data-cleaning
 exploration
 models
+kaplan-meier-curves
+logistic-regression-model
+weibull-parametric-model-for-draft-to-debut-times
+an-analysis-comparing-debut-likelihood-using-hazard-functions-and-a-cox-ph-model
 conclusion

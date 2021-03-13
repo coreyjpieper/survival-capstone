@@ -69,12 +69,18 @@
 <li class="chapter" data-level="0.1" data-path="index.html"><a href="index.html#motivation"><i class="fa fa-check"></i><b>0.1</b> Motivation</a></li>
 </ul></li>
 <li class="chapter" data-level="1" data-path="intro.html"><a href="intro.html"><i class="fa fa-check"></i><b>1</b> Introduction</a><ul>
-<li class="chapter" data-level="1.1" data-path="intro.html"><a href="intro.html#background"><i class="fa fa-check"></i><b>1.1</b> Background</a></li>
-<li class="chapter" data-level="1.2" data-path="intro.html"><a href="intro.html#data-sources"><i class="fa fa-check"></i><b>1.2</b> Data Sources</a></li>
-<li class="chapter" data-level="1.3" data-path="intro.html"><a href="intro.html#data-cleaning"><i class="fa fa-check"></i><b>1.3</b> Data Cleaning</a></li>
+<li class="chapter" data-level="1.1" data-path="intro.html"><a href="intro.html#introduction-to-survival-analysis"><i class="fa fa-check"></i><b>1.1</b> Introduction to Survival Analysis</a></li>
+<li class="chapter" data-level="1.2" data-path="intro.html"><a href="intro.html#background"><i class="fa fa-check"></i><b>1.2</b> Background</a></li>
+<li class="chapter" data-level="1.3" data-path="intro.html"><a href="intro.html#data-sources"><i class="fa fa-check"></i><b>1.3</b> Data Sources</a></li>
+<li class="chapter" data-level="1.4" data-path="intro.html"><a href="intro.html#data-cleaning"><i class="fa fa-check"></i><b>1.4</b> Data Cleaning</a></li>
 </ul></li>
 <li class="chapter" data-level="2" data-path="exploration.html"><a href="exploration.html"><i class="fa fa-check"></i><b>2</b> Exploratory Data Analysis</a></li>
-<li class="chapter" data-level="3" data-path="models.html"><a href="models.html"><i class="fa fa-check"></i><b>3</b> Models</a></li>
+<li class="chapter" data-level="3" data-path="models.html"><a href="models.html"><i class="fa fa-check"></i><b>3</b> Models</a><ul>
+<li class="chapter" data-level="3.1" data-path="models.html"><a href="models.html#kaplan-meier-curves"><i class="fa fa-check"></i><b>3.1</b> Kaplan Meier Curves</a></li>
+<li class="chapter" data-level="3.2" data-path="models.html"><a href="models.html#logistic-regression-model"><i class="fa fa-check"></i><b>3.2</b> Logistic Regression Model</a></li>
+<li class="chapter" data-level="3.3" data-path="models.html"><a href="models.html#weibull-parametric-model-for-draft-to-debut-times"><i class="fa fa-check"></i><b>3.3</b> Weibull Parametric Model for draft to debut times</a></li>
+<li class="chapter" data-level="3.4" data-path="models.html"><a href="models.html#an-analysis-comparing-debut-likelihood-using-hazard-functions-and-a-cox-ph-model"><i class="fa fa-check"></i><b>3.4</b> An analysis comparing debut likelihood using hazard functions and a Cox PH model</a></li>
+</ul></li>
 <li class="chapter" data-level="4" data-path="conclusion.html"><a href="conclusion.html"><i class="fa fa-check"></i><b>4</b> Conclusion</a></li>
 </ul>
 
@@ -95,6 +101,9 @@
             <section class="normal" id="section-">
 <div id="conclusion" class="section level1">
 <h1><span class="header-section-number">4</span> Conclusion</h1>
+<p>At the conclusion of this project, we have shown that it typically takes a high school player about a year longer than a college player to debut after being drafted, given that both players debut. Additionally, we have seen that catchers tend to take a longer time to debut after being drafted than other positions, while third basemen and second basemen tend to take a shorter time to debut after being drafted.</p>
+<p>One limitation to this work was that we only used date over a period of 6 years because we decided to work with only players that made their debut. As a result of this, for some positions we have a lot more observations than others. Additionally, we were limited on the variables that we could have used as predictors in our model. The data that we used contained some stats for the players that reached the major leagues, but we did not have minor league statistics for these players. In the future, it could be really interesting to see how a good or bad minor league season impacts a player’s time to debut or their probability of making a major league debut.</p>
+<p>As more data has become available within major league baseball, strategy and planning has become an increasingly important part of having a successful team. Overall, we hope these results can be useful for teams as they plan for their future seasons and decide which players to draft and when.</p>
 
 </div>
             </section>
@@ -153,6 +162,20 @@ gitbook.start({
 });
 </script>
 
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    var src = "true";
+    if (src === "" || src === "true") src = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML";
+    if (location.protocol !== "file:")
+      if (/^https?:/.test(src))
+        src = src.replace(/^https?:/, '');
+    script.src = src;
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
 </body>
 
 </html>
