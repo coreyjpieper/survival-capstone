@@ -1,1 +1,7 @@
 # Conclusion
+
+At the conclusion of this project, we have shown that it typically takes a high school player about a year longer than a college player to debut after being drafted, given that both players debut. Additionally, we have seen that catchers tend to take a longer time to debut after being drafted than other positions, while third basemen and second basemen tend to take a shorter time to debut after being drafted.
+
+One limitation to this work was that we only used date over a period of 6 years because we decided to work with only players that made their debut. As a result of this, for some positions we have a lot more observations than others. Additionally, we were limited on the variables that we could have used as predictors in our model. The data that we used contained some stats for the players that reached the major leagues, but we did not have minor league statistics for these players. In the future, it could be really interesting to see how a good or bad minor league season impacts a player's time to debut or their probability of making a major league debut.
+
+As more data has become available within major league baseball, strategy and planning has become an increasingly important part of having a successful team. Overall, we hope these results can be useful for teams as they plan for their future seasons and decide which players to draft and when.

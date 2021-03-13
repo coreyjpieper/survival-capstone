@@ -1,5 +1,11 @@
 # Introduction {#intro}
 
+> The following section can be skipped for those who are already familair with survival analysis.
+
+## Introduction to Survival Analysis 
+
+Before we get deep into the conclusions we reach about time to debut trends in major league baseball, we should first introduce a few key terms. This is a survival analysis project, meaning it is a statistical analysis where the response variable being modeled is a length of time from an initiating event (a player being drafted) until a terminating event (the player making their MLB debut). You may be wondering how we account for players that do not debut, as they have no terminating event. These players are known as right censored, which means we have a lower bound on their survival time. Typically in survival analysis these observations are given a status of 0 to denote them as censored and then survival calculations are made with them included in the data. We will discuss how we experimented with this process and why censoring did not necessarily work for what we were trying to accomplish. Another important term that we will use throughout this website is "survival curves". A survival curve is a downward sloping curve ranging from 0 to 1 on the y axis, which represents the proportion of the population remaining overtime. Finding the area under a survival curve will give the mean survival time of the population. A Kaplan-Meier curve is a variation of a survival curve that accounts for censored data. When data is right censored, the Kaplan-Meier curve will have a longer mean survival time than the original survival curve. Over the course of this website, we will introduce and explain more complex survival analysis terms including hazard functions, Cox-Snell models, likelihood ratio tests, and others. 
+
 ## Background
 
 There has been much prior work that has applied survival analysis to baseball, much of it related to predicting career length. [Witnauer, Rogers, and Onge][Witnauer] studied the career length of baseball players with respect to their age at the start of their career and what decade they played in. [Smith and Christensen][Smith] assessed psychological skills in minor league players and found that they were predictive of current performance and later survival in major league baseball. Besides published research, many others have carried out their own statistical analyses of baseball. The relationship between career length and batting / throwing hand were examined in a [blog post by Micah Melling][Melling] using Kaplan Meier curves and a Cox proportional hazards model. He found that switch hitters had a much higher survival curve than other hitters, and left-handed hitters had slightly higher survival than right-handed hitters. In another interesting analysis, Scott Spencer studied [how long a starting pitcher lasts in a game][Spencer] and looked at performance factors such as runs and baserunners allowed.
@@ -13,9 +19,66 @@ We did not find any previous analyses which examined time to debut of baseball p
 
 ## Data Sources
 
-The data set we used for our analysis combined two data sets, one containing information on MLB drafts and another containing information on player debuts. The draft data set has data on drafts between 1965-2019 and can be found [here on GitHub](https://github.com/double-dose-larry/baseball_draft_data) . This data itself was compiled from the [MLB Data API](https://appac.github.io/mlb-data-api-docs/). The debuts data set lists players debuts between 2005-2019 and was manually put together using data from [Baseball Reference](https://www.baseball-reference.com/).
+The data set we used for our analysis combined two data sets, one containing information on MLB drafts and another containing information on player debuts. The draft data set has data on drafts between 1965-2019 and can be found [here on GitHub](https://github.com/double-dose-larry/baseball_draft_data). This data itself was compiled from the [MLB Data API](https://appac.github.io/mlb-data-api-docs/). The debuts data set lists players debuts between 2005-2019 and was manually put together using data from [Baseball Reference](https://www.baseball-reference.com/).
   
 ## Data Cleaning
 
 As with any statistical analysis, a significant amount of time was spent getting the data in a usable form. Only the June Amateur Draft is included in our analysis and players drafted since 2005 in order to match the debuts data set. Since far more players are drafted than the number that reach the majors, we left joined the MLB draft data with the debuts data. In addition, because players can be drafted multiple times, we took the most recent draft date for each player.
+
+Afterwards, we decided to focus our analysis on players who reached the majors rather than all players. We made this decision because only about 1/5 of drafted players who play in the minors make it to the big leagues, so the majority of players do not have debut dates. In the context of survival analysis, these players survive forever, and as a result this will lead to large estimates for things like mean survival time. The fact that most players survive, or never debut, is something that is unique about this analysis since it is often the case that the survival of individuals goes to 0 as time goes to infinity (e.g. survival of patient with a disease or survival of light bulbs). Because of this, it may be hard to see slight differences between groups because survival is so high. The following weibull model demonstrates this:
+
+```{r, include=FALSE}
+draftdata <- read_csv("draft_1965_2019-2.csv") 
+debuts <- read_xlsx("2005-2019 Debuts.xlsx")
+```
+
+```{r, include=FALSE}
+draftdata$birth_date <- as.Date(draftdata$birth_date)
+draftdata519 <- draftdata %>%
+  filter(year >= 2005 ) %>%
+  mutate(hs = grepl("\\bHS\\b", school)) %>%
+  #filter to only have the June Amateur draft included
+  filter(draft_type == "JR")
+
+#join the drafts data with the debut data; clean and organize data 
+joined <- draftdata519 %>%
+  left_join(debuts, by = c("name_first_last" = "Name", "birth_date" = "Birthdate"))
+
+joined <- joined %>%
+  select(name_first_last, name_last_first, primary_position, bats, throws, birth_date, weight, team_full, team_abbrev, league_full, school, hs, avg, hr, rbi, so, sb, w, l, era, sv,
+year, overall, round, pick, round_sort, round_desc, draft_type, description,mlb_g, milb_g, Debut, `Last Game`, WAR, Birthplace)
+
+joined$Debut <- as.Date(joined$Debut)
+joined$`Last Game` <- as.Date(joined$`Last Game`)
+
+# remove duplicates
+newdata <- joined %>% 
+  group_by(name_first_last, birth_date) %>%
+  filter(year == max(year))
+
+newdata <- ungroup(newdata)
+
+#record mlb_g and milb_g
+newdata$mlb_g <- as.integer(newdata$mlb_g == "Y")
+newdata$milb_g <- as.integer(newdata$milb_g == "Y")
+
+# add censored Debut time
+newdata <- newdata %>%
+  mutate(draftdate = as.Date(paste(year, "6", "10", sep="-"), "%Y-%m-%d")) %>%
+  mutate(Debut = if_else(!is.na(Debut), Debut, pmin(draftdate + 2964, as.Date("2019-09-30")))) %>%
+  mutate(timetodebut = as.numeric(Debut - draftdate))
+```
+
+```{r}
+weiballplayers = survreg(Surv(timetodebut, mlb_g) ~ hs , dist = "weibull" , data = newdata)
+
+curve(1 - pweibull(x, 1 / 0.605 , exp( 9.006)), xlim = c(0, 4000), ylim = c(0.5, 1), xlab = "Days", ylab = "Survival", main = "Weibull of Time to Debut")
+curve(1 - pweibull(x, 1 / 0.605, exp(9.006 + 0.0567)), add = TRUE, col = "red")
+
+legend(100, 0.6, legend = c("college", "high school"), col=c("black", "red"),lty=1,cex=0.8)
+```
+Even after 4000 days, or about 11 years, the model shows that most players still haven't debuted, and it's hard to distinguish between the survival curves of high school vs college players.
+
+We split up our analysis into two components, or a two-phase model. In the first phase, we predicted the probability of a player reaching the majors based on factors such as batting hand, if they were drafted out of high school or college, and their position. In the second phase, we created non-parametric and parametric models of survival considering only players that debuted. Furthermore, we limited our data set of debuted players to those that were drafted between 2005-2011 in order to allow up to 8 years for players to debut (since the debuts data only goes to 2019). The reason we choose 8 years was because this was the 95% quantile of debut times, which we will show in the next section.
+
 

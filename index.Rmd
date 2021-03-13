@@ -10,6 +10,18 @@ site: bookdown::bookdown_site
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
+```{r}
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(glmnet)
+library(readr)
+library(readxl)
+library(survival)
+library(survminer)
+library(bookdown)
+```
+
 # Overview {-}
 
   In this project we conducted a survival analysis of the time from draft date to debut date for major league baseball players. Our analysis specifically focuses on the variables of fielding position and whether a player was drafted in high school or college, and how these differences change a player’s time from draft to debut. 
